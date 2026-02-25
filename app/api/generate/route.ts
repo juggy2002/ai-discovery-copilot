@@ -61,7 +61,36 @@ function normalizeBrief(data: any) {
       ? data.instrumentation_events
       : [],
   };
+}function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
 }
+
+async function withRetry<T>(fn: () => Promise<T>, attempts = 4): Promise<T> {
+  let lastErr: any;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      lastErr = err;
+
+      const status =
+        err?.status ??
+        err?.response?.status ??
+        err?.error?.status;
+
+      // Anthropic overloaded error
+      const msg = String(err?.message || "");
+      const isOverloaded = status === 529 || msg.includes("529") || msg.includes("overloaded");
+
+      if (!isOverloaded || i === attempts - 1) throw err;
+
+      // backoff: 500ms, 1000ms, 2000ms...
+      await sleep(500 * Math.pow(2, i));
+    }
+  }
+  throw lastErr;
+}
+
 
 async function repairJson(badJson: string): Promise<string> {
   const fixer = await anthropic.messages.create({
