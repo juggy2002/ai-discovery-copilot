@@ -6,6 +6,39 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function isOverloadedError(err: any) {
+  const status = err?.status ?? err?.response?.status ?? err?.error?.status;
+  const msg = String(err?.message || "").toLowerCase();
+  const body = String(err?.error?.message || "").toLowerCase();
+
+  return status === 529 || msg.includes("529") || msg.includes("overloaded") || body.includes("overloaded");
+}
+
+async function withRetry<T>(fn: () => Promise<T>, attempts = 4): Promise<T> {
+  let lastErr: any;
+
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      lastErr = err;
+
+      if (!isOverloadedError(err) || i === attempts - 1) {
+        throw err;
+      }
+
+      // Exponential backoff: 500ms, 1000ms, 2000ms, 4000ms
+      await sleep(500 * Math.pow(2, i));
+    }
+  }
+
+  throw lastErr;
+}
+
 function extractJsonObject(text: string): string | null {
   const cleaned = text
     .replace(/^```json\s*/i, "")
@@ -45,69 +78,33 @@ function normalizeBrief(data: any) {
         ? data.mvp_scope_2_weeks.out_of_scope
         : [],
     },
-    key_user_flows: Array.isArray(data?.key_user_flows)
-      ? data.key_user_flows
-      : [],
-    success_metrics: Array.isArray(data?.success_metrics)
-      ? data.success_metrics
-      : [],
-    risks_and_unknowns: Array.isArray(data?.risks_and_unknowns)
-      ? data.risks_and_unknowns
-      : [],
-    experiment_plan: Array.isArray(data?.experiment_plan)
-      ? data.experiment_plan
-      : [],
+    key_user_flows: Array.isArray(data?.key_user_flows) ? data.key_user_flows : [],
+    success_metrics: Array.isArray(data?.success_metrics) ? data.success_metrics : [],
+    risks_and_unknowns: Array.isArray(data?.risks_and_unknowns) ? data.risks_and_unknowns : [],
+    experiment_plan: Array.isArray(data?.experiment_plan) ? data.experiment_plan : [],
     instrumentation_events: Array.isArray(data?.instrumentation_events)
       ? data.instrumentation_events
       : [],
   };
-}function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
 }
-
-async function withRetry<T>(fn: () => Promise<T>, attempts = 4): Promise<T> {
-  let lastErr: any;
-  for (let i = 0; i < attempts; i++) {
-    try {
-      return await fn();
-    } catch (err: any) {
-      lastErr = err;
-
-      const status =
-        err?.status ??
-        err?.response?.status ??
-        err?.error?.status;
-
-      // Anthropic overloaded error
-      const msg = String(err?.message || "");
-      const isOverloaded = status === 529 || msg.includes("529") || msg.includes("overloaded");
-
-      if (!isOverloaded || i === attempts - 1) throw err;
-
-      // backoff: 500ms, 1000ms, 2000ms...
-      await sleep(500 * Math.pow(2, i));
-    }
-  }
-  throw lastErr;
-}
-
 
 async function repairJson(badJson: string): Promise<string> {
-  const fixer = await anthropic.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 2200,
-    temperature: 0,
-    system:
-      "You fix invalid JSON. Return ONLY corrected strict JSON (no markdown, no explanation).",
-    messages: [
-      {
-        role: "user",
-        content:
-          "Fix this to strict valid JSON. Do not change meaning. Return JSON only:\n\n" +
-          badJson,
-      },
-    ],
-  });
+  const fixer = await withRetry(() =>
+    anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 2200,
+      temperature: 0,
+      system: "You fix invalid JSON. Return ONLY corrected strict JSON (no markdown, no explanation).",
+      messages: [
+        {
+          role: "user",
+          content:
+            "Fix this to strict valid JSON. Do not change meaning. Return JSON only:\n\n" +
+            badJson,
+        },
+      ],
+    })
+  );
 
   const fixedRaw = fixer.content
     .filter((c) => c.type === "text")
@@ -158,13 +155,15 @@ Return ONLY valid JSON following this schema:
   "instrumentation_events": string[]
 }`;
 
-    const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 2200,
-      temperature: 0,
-      system,
-      messages: [{ role: "user", content: inputText }],
-    });
+    const msg = await withRetry(() =>
+      anthropic.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 2200,
+        temperature: 0,
+        system,
+        messages: [{ role: "user", content: inputText }],
+      })
+    );
 
     const raw = msg.content
       .filter((c) => c.type === "text")
@@ -176,10 +175,7 @@ Return ONLY valid JSON following this schema:
 
     if (!jsonCandidate) {
       return Response.json(
-        {
-          error: "Claude returned no JSON object",
-          details: raw.slice(0, 800),
-        },
+        { error: "Claude returned no JSON object", details: raw.slice(0, 800) },
         { status: 500 }
       );
     }
@@ -188,7 +184,7 @@ Return ONLY valid JSON following this schema:
     try {
       const parsed = JSON.parse(jsonCandidate);
       return Response.json({ data: normalizeBrief(parsed) }, { status: 200 });
-    } catch (e1: any) {
+    } catch {
       // Repair pass
       const repaired = await repairJson(jsonCandidate);
 
@@ -207,12 +203,17 @@ Return ONLY valid JSON following this schema:
       }
     }
   } catch (err: any) {
+    // Return a friendly status for 529 overloads so the UI can show “try again”
+    if (isOverloadedError(err)) {
+      return Response.json(
+        { error: "Claude is temporarily overloaded (529). Please try again in ~10–30 seconds." },
+        { status: 503 }
+      );
+    }
+
     const details =
       err?.message || err?.error?.message || JSON.stringify(err, null, 2);
 
-    return Response.json(
-      { error: "Claude request failed", details },
-      { status: 500 }
-    );
+    return Response.json({ error: "Claude request failed", details }, { status: 500 });
   }
 }
