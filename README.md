@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Discovery Copilot
 
-## Getting Started
+AI-powered product discovery tool that converts messy problem statements into a structured discovery brief:
+assumptions, target users, MVP scope (2 weeks), success metrics, risks, experiments, and instrumentation events.
 
-First, run the development server:
+**Live demo:** (paste your Vercel URL here)  
+**Tech:** Next.js (App Router), Tailwind CSS, Claude Sonnet 4.6 (Anthropic)
 
+---
+
+## Why this exists
+
+Teams often lose time turning qualitative feedback into a clear plan. This tool accelerates early discovery by producing a consistent brief that can be pasted into product docs, Jira tickets, or a PRD.
+
+---
+
+## Features
+
+- Paste a problem statement → generates a structured discovery brief
+- Stable JSON output with validation + automatic repair (production-style reliability)
+- Example prompts + clean UI
+- Export: copy/download JSON
+
+---
+
+## Output schema
+
+The brief includes:
+- problem_summary
+- assumptions
+- target_users
+- current_pain_signals
+- desired_outcomes
+- mvp_scope_2_weeks (must_have / nice_to_have / out_of_scope)
+- key_user_flows
+- success_metrics
+- risks_and_unknowns
+- experiment_plan
+- instrumentation_events
+
+---
+
+## Run locally
+
+1) Install
 ```bash
+npm install
+
+2) Add env var
+Create .env.local:
+ANTHROPIC_API_KEY="YOUR_KEY"
+
+3) Start dev server 
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Notes
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Uses Claude Sonnet 4.6 (claude-sonnet-4-6)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+API route: POST /api/generate
 
-## Learn More
+## Screenshots
 
-To learn more about Next.js, take a look at the following resources:
+![alt text](image-1.png)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+![alt text](image.png)
