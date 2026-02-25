@@ -10,11 +10,11 @@ function Card({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
-      <h3 className="mb-3 text-sm font-semibold tracking-wide text-neutral-800">
+    <section className="rounded-2xl border border-white/10 bg-white/70 p-5 shadow-sm ring-1 ring-black/5 backdrop-blur">
+      <h3 className="mb-3 text-sm font-semibold tracking-wide text-neutral-900">
         {title}
       </h3>
-      <div className="text-sm text-neutral-700">{children}</div>
+      <div className="text-sm text-neutral-800">{children}</div>
     </section>
   );
 }
@@ -64,7 +64,7 @@ export default function Page() {
   async function generate() {
     setLoading(true);
     setError(null);
-    setBrief(null);
+    // keep last brief visible while generating
 
     try {
       const res = await fetch("/api/generate", {
@@ -106,30 +106,41 @@ export default function Page() {
     setError(null);
   }
 
+  const showOverloadRetry = Boolean(error?.toLowerCase().includes("overloaded"));
+
   return (
-    <main className="min-h-screen bg-neutral-50">
+    <main className="min-h-screen bg-[radial-gradient(1200px_700px_at_20%_-10%,rgba(99,102,241,0.35),transparent_60%),radial-gradient(900px_600px_at_95%_0%,rgba(236,72,153,0.28),transparent_55%),linear-gradient(to_bottom,rgba(255,255,255,1),rgba(250,250,255,1))]">
       <div className="mx-auto max-w-5xl px-4 py-10">
+        {/* Hero */}
         <header className="mb-8">
-          <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/50 px-3 py-1 text-xs font-medium text-neutral-800 shadow-sm ring-1 ring-black/5 backdrop-blur">
+            <span className="h-2 w-2 rounded-full bg-gradient-to-r from-indigo-500 to-fuchsia-500" />
+            Claude-powered • Discovery → MVP in minutes
+          </div>
+
+          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-neutral-950">
             AI Discovery Copilot
           </h1>
-          <p className="mt-2 max-w-2xl text-sm text-neutral-600">
-            Paste a product problem statement → get a structured discovery brief you can reuse in docs,
-            tickets, or a portfolio case study.
+
+          <p className="mt-2 max-w-2xl text-sm text-neutral-700">
+            Paste a product problem statement → generate a structured discovery brief
+            (scope, metrics, risks, experiments, instrumentation).
           </p>
         </header>
 
-        <div className="mb-6 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
-          <label className="text-sm font-medium text-neutral-800">
+        {/* Input */}
+        <div className="mb-6 rounded-2xl border border-white/10 bg-white/70 p-5 shadow-sm ring-1 ring-black/5 backdrop-blur">
+          <label className="text-sm font-medium text-neutral-900">
             Problem statement
           </label>
 
           <textarea
-            className="mt-2 w-full rounded-xl border border-neutral-200 bg-white p-3 text-sm text-neutral-800 outline-none focus:ring-2 focus:ring-neutral-300 disabled:opacity-60"
+            className="mt-2 w-full rounded-xl border border-neutral-200 bg-white/80 p-3 text-sm text-neutral-900 outline-none focus:ring-2 focus:ring-indigo-300 disabled:opacity-60"
             rows={6}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             disabled={loading}
+            placeholder="e.g. Users are dropping off during onboarding and support tickets are rising..."
           />
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -139,19 +150,19 @@ export default function Page() {
                 type="button"
                 onClick={() => setInputText(ex.text)}
                 disabled={loading}
-                className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 disabled:opacity-60"
+                className="rounded-full border border-neutral-200 bg-white/80 px-3 py-1.5 text-xs font-medium text-neutral-800 hover:bg-white disabled:opacity-60"
               >
                 {ex.label}
               </button>
             ))}
 
             <div className="ml-auto flex items-center gap-2">
-              <span className="text-xs text-neutral-500">{inputText.length} chars</span>
+              <span className="text-xs text-neutral-600">{inputText.length} chars</span>
               <button
                 type="button"
                 onClick={clearAll}
                 disabled={loading}
-                className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 disabled:opacity-60"
+                className="rounded-full border border-neutral-200 bg-white/80 px-3 py-1.5 text-xs font-medium text-neutral-800 hover:bg-white disabled:opacity-60"
               >
                 Clear
               </button>
@@ -162,7 +173,7 @@ export default function Page() {
             <button
               onClick={generate}
               disabled={loading || !inputText.trim()}
-              className="rounded-xl bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+              className="rounded-xl bg-gradient-to-r from-indigo-600 to-fuchsia-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:from-indigo-500 hover:to-fuchsia-500 disabled:opacity-60"
             >
               {loading ? "Generating brief…" : "Generate brief"}
             </button>
@@ -170,7 +181,7 @@ export default function Page() {
             <button
               onClick={copyJson}
               disabled={!brief}
-              className="rounded-xl border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-800 disabled:opacity-60"
+              className="rounded-xl border border-neutral-200 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-900 hover:bg-white disabled:opacity-60"
             >
               Copy JSON
             </button>
@@ -178,15 +189,29 @@ export default function Page() {
             <button
               onClick={downloadJson}
               disabled={!brief}
-              className="rounded-xl border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-800 disabled:opacity-60"
+              className="rounded-xl border border-neutral-200 bg-white/80 px-4 py-2 text-sm font-medium text-neutral-900 hover:bg-white disabled:opacity-60"
             >
               Download JSON
             </button>
 
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && (
+              <div className="w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                {error}
+                {showOverloadRetry && (
+                  <button
+                    type="button"
+                    onClick={generate}
+                    className="ml-3 font-semibold underline underline-offset-2"
+                  >
+                    Try again
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
+        {/* Output */}
         {brief ? (
           <div className="space-y-4">
             <Card title="Problem summary">
@@ -214,15 +239,15 @@ export default function Page() {
             <Card title="MVP scope (2 weeks)">
               <div className="grid gap-4 md:grid-cols-3">
                 <div>
-                  <p className="mb-2 font-medium text-neutral-800">Must-have</p>
+                  <p className="mb-2 font-medium text-neutral-900">Must-have</p>
                   <List items={brief.mvp_scope_2_weeks?.must_have} />
                 </div>
                 <div>
-                  <p className="mb-2 font-medium text-neutral-800">Nice-to-have</p>
+                  <p className="mb-2 font-medium text-neutral-900">Nice-to-have</p>
                   <List items={brief.mvp_scope_2_weeks?.nice_to_have} />
                 </div>
                 <div>
-                  <p className="mb-2 font-medium text-neutral-800">Out of scope</p>
+                  <p className="mb-2 font-medium text-neutral-900">Out of scope</p>
                   <List items={brief.mvp_scope_2_weeks?.out_of_scope} />
                 </div>
               </div>
@@ -250,20 +275,24 @@ export default function Page() {
               <List items={brief.instrumentation_events} />
             </Card>
 
-            <details className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
-              <summary className="cursor-pointer text-sm font-semibold text-neutral-800">
+            <details className="rounded-2xl border border-white/10 bg-white/70 p-5 shadow-sm ring-1 ring-black/5 backdrop-blur">
+              <summary className="cursor-pointer text-sm font-semibold text-neutral-900">
                 View raw JSON
               </summary>
-              <pre className="mt-3 overflow-auto rounded-xl bg-neutral-50 p-4 text-xs text-neutral-800">
+              <pre className="mt-3 overflow-auto rounded-xl bg-neutral-950/95 p-4 text-xs text-neutral-100">
                 {pretty}
               </pre>
             </details>
           </div>
         ) : (
-          <div className="rounded-2xl border border-dashed border-neutral-300 bg-white p-10 text-center text-sm text-neutral-600">
+          <div className="rounded-2xl border border-dashed border-neutral-300 bg-white/70 p-10 text-center text-sm text-neutral-700 shadow-sm ring-1 ring-black/5 backdrop-blur">
             Generate a brief to see results here.
           </div>
         )}
+
+        <footer className="mt-10 text-xs text-neutral-600">
+          Tip: try “Checkout drop-off” then tweak the prompt to match a company you’re applying to.
+        </footer>
       </div>
     </main>
   );
